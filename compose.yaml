@@ -1,0 +1,38 @@
+services:
+  frontend:
+    image: node:24-bookworm
+    working_dir: /app
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      API_PROXY_TARGET: http://backend:8080
+      DEV_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - frontend_dependencies:/app/node_modules
+      - npm_cache:/root/.npm
+    command:
+      - sh
+      - -c
+      - npm ci && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
+
+  backend:
+    image: eclipse-temurin:25-jdk
+    working_dir: /app
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:sqlite:/app/data/hearforthevibes.db
+    volumes:
+      - ./backend:/app
+      - backend_build:/app/target
+      - maven_cache:/root/.m2
+      - database:/app/data
+    command: ["sh", "./mvnw", "spring-boot:run"]
+
+volumes:
+  frontend_dependencies:
+  npm_cache:
+  backend_build:
+  maven_cache:
+  database:
