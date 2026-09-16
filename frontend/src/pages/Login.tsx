@@ -54,28 +54,19 @@ export default function Login() {
               <polyline points="21 3 21 9 15 9" />
             </svg>
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900">Swouse</span>
+          <span className="text-xl font-bold tracking-tight text-slate-900">Subscription Tracker</span>
         </div>
 
         {/* Heading */}
         <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-          Swouse
+          Welcome Back
         </h1>
         <p className="mt-1.5 text-center text-sm text-slate-500">
-          Take control of your software recurring spending
+          Enter your cradentials to access your account
         </p>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-7 space-y-4">
-          <div>
-            <label htmlFor="fullName" className={labelClass}>Full Name</label>
-            <input
-              id="fullName" type="text" autoComplete="name" placeholder="John Doe"
-              value={fullName} onChange={(e) => setFullName(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
-
           <div>
             <label htmlFor="email" className={labelClass}>Email address</label>
             <input
@@ -92,7 +83,7 @@ export default function Login() {
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
-                placeholder="Create robust password"
+                placeholder="Enter Password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
                 className={`${fieldClass} pr-11`}
               />
@@ -105,42 +96,26 @@ export default function Login() {
                 <EyeIcon open={showPassword} />
               </button>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className={labelClass}>Confirm Password</label>
-            <div className="relative">
-              <input
-                id="confirmPassword"
-                type={showConfirm ? 'text' : 'password'}
-                autoComplete="new-password"
-                placeholder="Repeat your password"
-                value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                className={`${fieldClass} pr-11`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm((v) => !v)}
-                aria-label={showConfirm ? 'Hide password' : 'Show password'}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none focus:text-indigo-600"
-              >
-                <EyeIcon open={showConfirm} />
-              </button>
-            </div>
+            
+            <p className="mt-6 text-center text-sm text-slate-500">
+                <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+                Forgot Password?
+                </Link>
+            </p>
           </div>
 
           <button
             type="submit"
             className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
-            Create Account
+            Sign in
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Don't have an account?{' '}
             <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
-            Register
+            Create an account
             </Link>
         </p>
       </div>
