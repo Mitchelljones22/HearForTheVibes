@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as React from "react";
 
 function EyeIcon({ open }: { open: boolean }) {
   return (
@@ -110,7 +111,7 @@ export default function Register() {
     setTouched((prev) => ({ ...prev, [name]: true }));
     setErrors((prev) => ({ ...prev, [name]: runValidation(name) ?? undefined }));
   }
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     const names: FieldName[] = ['fullName', 'email', 'phone', 'password', 'confirmPassword'];
     const nextErrors: Partial<Record<FieldName, string>> = {};
