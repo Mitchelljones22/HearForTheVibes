@@ -22,16 +22,16 @@ function ErrorText({ id, message }: { id: string; message?: string }) {
   );
 }
 
-// Validation rules (pure functions, easy to move to utils/ later
+// Keep these rules aligned with RegisterRequest on the backend.
 
-function validateFullName(value: string): string | null {
-  if (!value.trim()) return 'Full name is required.';
+function validateName(value: string, label: string): string | null {
+  if (!value.trim()) return `${label} is required.`;
   return null;
 }
 
 function validateEmail(value: string): string | null {
   if (!value.trim()) return 'Email address is required.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim())) {
     return 'Enter a complete email address, like john@example.com.';
   }
   return null;
@@ -46,6 +46,7 @@ function validatePhone(value: string): string | null {
 
 function validatePassword(value: string): string | null {
   if (value.length < 8) return 'Password must be at least 8 characters.';
+  if (value.length > 1024) return 'Password must be at most 1024 characters.';
   if (!/[A-Z]/.test(value)) return 'Password must include an uppercase letter.';
   if (!/[a-z]/.test(value)) return 'Password must include a lowercase letter.';
   if (!/[0-9]/.test(value)) return 'Password must include a number.';
@@ -62,20 +63,40 @@ function formatPhone(value: string): string {
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
-type FieldName = 'fullName' | 'email' | 'phone' | 'password' | 'confirmPassword';
+type FieldName = 'firstName' | 'lastName' | 'email' | 'phone' | 'password' | 'confirmPassword';
+const fieldNames: FieldName[] = ['firstName', 'lastName', 'email', 'phone', 'password', 'confirmPassword'];
+const emptyValues = {
+  firstName: '', lastName: '', email: '', phone: '', password: '', confirmPassword: '',
+};
+
+function readServerErrors(data: unknown): Partial<Record<FieldName | 'form', string>> {
+  if (!data || typeof data !== 'object' || !('errors' in data)) return {};
+  const incoming = data.errors;
+  if (!incoming || typeof incoming !== 'object') return {};
+  const errors: Partial<Record<FieldName | 'form', string>> = {};
+  for (const name of [...fieldNames, 'form'] as const) {
+    if (name in incoming) {
+      const message = incoming[name as keyof typeof incoming];
+      if (typeof message === 'string') errors[name] = message;
+    }
+  }
+  return errors;
+}
 
 export default function Register() {
-  const [values, setValues] = useState({
-    fullName: '', email: '', phone: '', password: '', confirmPassword: '',
-  });
+  const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [registered, setRegistered] = useState(false);
 
   function runValidation(name: FieldName, all = values): string | null {
     switch (name) {
-      case 'fullName': return validateFullName(all.fullName);
+      case 'firstName': return validateName(all.firstName, 'First name');
+      case 'lastName': return validateName(all.lastName, 'Last name');
       case 'email': return validateEmail(all.email);
       case 'phone': return validatePhone(all.phone);
       case 'password': return validatePassword(all.password);
@@ -87,6 +108,8 @@ export default function Register() {
   }
 
   function handleChange(name: FieldName, raw: string) {
+    setRegistered(false);
+    setFormError('');
     const value = name === 'phone' ? formatPhone(raw) : raw;
     const next = { ...values, [name]: value };
     setValues(next);
@@ -113,14 +136,17 @@ export default function Register() {
   }
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
-    const names: FieldName[] = ['fullName', 'email', 'phone', 'password', 'confirmPassword'];
+    if (isSubmitting) return;
+    setFormError('');
+    setRegistered(false);
+    const names = fieldNames;
     const nextErrors: Partial<Record<FieldName, string>> = {};
     for (const n of names) {
       const err = runValidation(n);
       if (err) nextErrors[n] = err;
     }
     setErrors(nextErrors);
-    setTouched({ fullName: true, email: true, phone: true, password: true, confirmPassword: true });
+    setTouched({ firstName: true, lastName: true, email: true, phone: true, password: true, confirmPassword: true });
 
     if (Object.keys(nextErrors).length > 0) {
       document.getElementById(names.find((n) => nextErrors[n])!)?.focus();
@@ -129,15 +155,17 @@ export default function Register() {
 
     // Send information to backend.
     // Contract: POST /api/auth/register
-    //   body   { fullName, email, phone, password }
+    //   body   { firstName, lastName, email, phone, password }
     //   errors { errors: { fieldName: "message" } }
-      const payload = {
-      fullName: values.fullName,
-      email: values.email,
-      phone: values.phone,
+    const payload = {
+      firstName: values.firstName.trim(),
+      lastName: values.lastName.trim(),
+      email: values.email.trim(),
+      phone: values.phone.replace(/\D/g, ''),
       password: values.password,
     };
 
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -147,13 +175,25 @@ export default function Register() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setErrors(data?.errors ?? { email: 'Registration failed. Try again.' });
+        const { form, ...fieldErrors } = readServerErrors(data);
+        setErrors(fieldErrors);
+        setFormError(form ?? (Object.keys(fieldErrors).length ? '' : 'Registration failed. Try again.'));
+        const firstError = names.find((name) => fieldErrors[name]);
+        // Wait until the disabled fields have been enabled again before focusing.
+        if (firstError) requestAnimationFrame(() => document.getElementById(firstError)?.focus());
         return;
       }
 
-      console.log('Registered'); // navigate('/login') once router is added
+      setRegistered(true);
+      setValues(emptyValues);
+      setTouched({});
+      setErrors({});
+      setShowPassword(false);
+      setShowConfirm(false);
     } catch {
-      setErrors({ email: 'Could not reach the server.' });
+      setFormError('Could not reach the server. Try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -193,23 +233,46 @@ export default function Register() {
           Take control of your software recurring spend
         </p>
 
-        <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
+        {registered && (
+          <p role="status" className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+            Account created successfully.
+          </p>
+        )}
+        {formError && (
+          <p role="alert" className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate className="mt-7" aria-busy={isSubmitting}>
+          <fieldset disabled={isSubmitting} className="space-y-4">
           <div>
-            <label htmlFor="fullName" className={labelClass}>Full Name</label>
+            <label htmlFor="firstName" className={labelClass}>First name</label>
             <input
-              id="fullName" type="text" autoComplete="name" placeholder="John Doe"
-              value={values.fullName}
-              onChange={(e) => handleChange('fullName', e.target.value)}
-              onBlur={() => handleBlur('fullName')}
-              aria-invalid={!!errors.fullName}
-              aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-              className={fieldClass('fullName')}
+              id="firstName" type="text" autoComplete="given-name" placeholder="John"
+              value={values.firstName}
+              onChange={(e) => handleChange('firstName', e.target.value)}
+              onBlur={() => handleBlur('firstName')}
+              aria-invalid={!!errors.firstName}
+              aria-describedby={errors.firstName ? 'firstName-error' : undefined}
+              className={fieldClass('firstName')}
             />
-            <ErrorText id="fullName-error" message={errors.fullName} />
+            <ErrorText id="firstName-error" message={errors.firstName} />
           </div>
 
-
-
+          <div>
+            <label htmlFor="lastName" className={labelClass}>Last name</label>
+            <input
+              id="lastName" type="text" autoComplete="family-name" placeholder="Doe"
+              value={values.lastName}
+              onChange={(e) => handleChange('lastName', e.target.value)}
+              onBlur={() => handleBlur('lastName')}
+              aria-invalid={!!errors.lastName}
+              aria-describedby={errors.lastName ? 'lastName-error' : undefined}
+              className={fieldClass('lastName')}
+            />
+            <ErrorText id="lastName-error" message={errors.lastName} />
+          </div>
           <div>
             <label htmlFor="email" className={labelClass}>Email address</label>
             <input
@@ -293,9 +356,10 @@ export default function Register() {
           </div>
 
           <button type="submit"
-            className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-            Create Account
+            className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            {isSubmitting ? 'Creating account...' : 'Create Account'}
           </button>
+          </fieldset>
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-500">
