@@ -10,7 +10,7 @@ Use Docker Compose to run the frontend and backend together. Docker provides Nod
 | Backend | Java 25, Spring Boot 4.1.1, Maven Wrapper |
 | Database | SQLite, stored in a persistent Docker volume |
 
-This configuration is for local development. The project currently contains the starter applications; API endpoints and database tables will be added as features are implemented.
+This configuration is for local development. The registration form creates accounts through the Spring Boot API. See [Registration](docs/Registration.md) for the request format, validation rules, and code walkthrough.
 
 ## 1. Install the prerequisites
 
@@ -52,7 +52,7 @@ The first start downloads container images, Node dependencies, Maven, and Java d
 | Frontend | [http://localhost:5173](http://localhost:5173) |
 | Backend | [http://localhost:8080](http://localhost:8080) |
 
-The frontend should display the starter page. A 404 at the backend's root address is expected until a route is implemented; check the backend startup logs to confirm it is running.
+The frontend displays the registration form. A 404 at the backend's root address is expected; the registration endpoint is `POST /api/auth/register`. Check the backend startup logs to confirm it is running.
 
 Keep this terminal open to see logs. Alternatively, start in the background with `docker compose up -d`.
 
@@ -93,7 +93,7 @@ docker compose exec frontend npm run build
 docker compose exec backend sh ./mvnw test
 ```
 
-These use the container tools; no local Node or Java installation is required. The current backend test checks application startup. Feature and database behavior need their own tests as development progresses.
+These use the container tools; no local Node or Java installation is required. Backend tests cover application startup and registration, using separate SQLite databases under `backend/target` rather than the development database.
 
 ## Frontend-to-backend requests
 
@@ -122,7 +122,7 @@ Docker also keeps frontend dependencies, Maven downloads, and backend build outp
 | No Compose configuration found | Run the command from the folder containing `compose.yaml`. |
 | Port 5173 or 8080 is already allocated | Stop the old local server or other container using that port, then retry. |
 | Frontend appears before backend is ready | Wait for Spring Boot's startup message; inspect `docker compose logs backend` if it exits. |
-| `/api/...` returns 404 | Confirm that the backend implements that exact route. The starter project has no API endpoints yet. |
+| `/api/...` returns 404 | Confirm that the backend implements that exact route. Registration uses `POST /api/auth/register`. |
 | `npm ci` reports a lockfile mismatch | Ensure `package.json` and `package-lock.json` came from the same dependency update. |
 | Java edits do not take effect | Run `docker compose restart backend`; automatic Java reload is not configured. |
 | Maven script reports carriage-return or shell syntax errors | Ensure `backend/mvnw` uses LF line endings. The backend's `.gitattributes` specifies this for Git checkouts. |
