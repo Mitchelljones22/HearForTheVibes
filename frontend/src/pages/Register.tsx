@@ -220,23 +220,6 @@ export default function Register() {
       title="Get started today"
       subtitle="Take control of your software recurring spend"
     >
-      <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
-        <div>
-          <label htmlFor="fullName" className={labelClass}>Full Name</label>
-          <input
-            id="fullName" type="text" autoComplete="name" placeholder="John Doe"
-            value={values.fullName}
-            onChange={(e) => handleChange('fullName', e.target.value)}
-            onBlur={() => handleBlur('fullName')}
-            aria-invalid={!!errors.fullName}
-            aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-            className={fieldClass('fullName')}
-          />
-          <ErrorText id="fullName-error" message={errors.fullName} />
-        </div>
-
-
-
         {registered && (
           <p role="status" className="mt-5 rounded-lg bg-green-50 p-3 text-sm text-green-800">
             Account created successfully.
@@ -369,11 +352,10 @@ export default function Register() {
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Already have an account?{' '}
-          <a href="#" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+          <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
             Sign in
-          </a>
+          </Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }
