@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local-only mock data (see src/api/subscriptions.ts)
+src/mocks/
