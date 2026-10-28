@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout.tsx';
+import { LoginError } from '../api/users';
+import { useAuth } from '../auth/useAuth';
 
 function EyeIcon({ open }: { open: boolean }) {
   return (
@@ -48,6 +50,12 @@ export default function Login() {
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { auth, signIn } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  // Only follow same-site paths ("//evil.com" would point to another site).
+  const redirectTo = from?.startsWith('/') && !from.startsWith('//') ? from : '/dashboard';
 
   function runValidation(name: FieldName, all = values): string | null {
     return name === 'email' ? validateEmail(all.email) : validatePassword(all.password);
@@ -90,25 +98,11 @@ export default function Login() {
     //   401    wrong email or password
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: values.email, password: values.password }),
-      });
-
-      if (!res.ok) {
-        setErrors({
-          form: res.status === 401
-            ? 'Incorrect email or password.'
-            : 'Sign in failed. Try again.',
-        });
-        return;
-      }
-
-      console.log('Signed in'); // navigate('/dashboard') once the dashboard exists
-    } catch {
-      setErrors({ form: 'Could not reach the server.' });
-    } finally {
+      await signIn(values.email, values.password);
+      // Back to the page that sent them here, or the dashboard.
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setErrors({ form: err instanceof LoginError ? err.message : 'Could not reach the server.' });
       setSubmitting(false);
     }
   }
@@ -121,6 +115,9 @@ export default function Login() {
     errors[name]
       ? `${base} border-red-400 focus:border-red-500 focus:ring-red-500/30`
       : `${base} border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/30`;
+
+  // Already signed in (e.g. opened /login in a new tab): skip the form.
+  if (auth.status === 'signedIn') return <Navigate to={redirectTo} replace />;
 
   return (
     <AuthLayout
@@ -192,4 +189,4 @@ export default function Login() {
       </p>
     </AuthLayout>
   );
-}
+}
