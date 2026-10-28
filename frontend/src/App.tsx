@@ -4,6 +4,7 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
+import Profile from './pages/Profile';
 import AppLayout from './layouts/AppLayout';
 import ProtectedRoute from './auth/ProtectedRoute';
 import ResetPassword from './pages/ResetPassword'; //go to http://127.0.0.1:5173/resetpassword?token=test in order to avoid the expired link error
@@ -20,6 +21,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

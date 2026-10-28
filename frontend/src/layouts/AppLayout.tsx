@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { APP_NAME } from '../config';
 import AssistantWidget from '../components/AssistantWidget';
@@ -13,6 +13,9 @@ const navItems: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/dashboard', label: 'Overview', icon: <GridIcon className="h-5 w-5" /> },
   { to: '/analytics', label: 'Analytics & Spend', icon: <ChartIcon className="h-5 w-5" /> },
 ];
+
+// Shown above Sign out in the sidebar, and at the end of the page links on small screens.
+const profileItem = { to: '/profile', label: 'Profile & Settings', icon: <SettingsIcon className="h-5 w-5" /> };
 
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600';
 
@@ -30,7 +33,8 @@ function Brand() {
 function UserBadge({ user }: { user: CurrentUser }) {
   const initials = `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase();
   return (
-    <div className="flex items-center gap-3">
+    <Link to="/profile" aria-label="View your profile"
+          className={`flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-slate-100 ${focusRing}`}>
       <div className="hidden text-right sm:block">
         <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
         <p className="text-xs text-slate-500">{user.email}</p>
@@ -39,7 +43,7 @@ function UserBadge({ user }: { user: CurrentUser }) {
            aria-hidden="true">
         {initials}
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -67,10 +71,6 @@ function navClass({ isActive }: { isActive: boolean }) {
     isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
   }`;
 }
-
-const soonPill = (
-  <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
-);
 
 export default function AppLayout() {
   const { auth } = useAuth();
@@ -116,12 +116,10 @@ export default function AppLayout() {
         </nav>
 
         <div className="mt-auto space-y-1 border-t border-slate-200 pt-4">
-          <button type="button" onClick={comingSoon('Settings')}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 ${focusRing}`}>
-            <SettingsIcon className="h-5 w-5" />
-            Settings
-            {soonPill}
-          </button>
+          <NavLink to={profileItem.to} className={navClass}>
+            {profileItem.icon}
+            {profileItem.label}
+          </NavLink>
           <SignOutButton className="w-full text-left" />
         </div>
       </aside>
@@ -137,7 +135,7 @@ export default function AppLayout() {
 
         {/* On small screens the sidebar is hidden, so show the page links here. */}
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-4 pt-4 md:hidden">
-          {navItems.map((item) => (
+          {[...navItems, profileItem].map((item) => (
             <NavLink key={item.to} to={item.to} className={navClass}>
               {item.icon}
               <span className="whitespace-nowrap">{item.label}</span>

@@ -140,3 +140,57 @@ export function CloseIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function UserIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </Icon>
+  );
+}
+
+export function LockIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </Icon>
+  );
+}
+
+export function BellIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
+    </Icon>
+  );
+}
+
+export function CardIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20M6 15h4" />
+    </Icon>
+  );
+}
+
+export function ShieldIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </Icon>
+  );
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+      <path d="M10 11v5M14 11v5" />
+    </Icon>
+  );
+}
