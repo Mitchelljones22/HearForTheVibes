@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { APP_NAME } from '../config';
 import AssistantWidget from '../components/AssistantWidget';
-import { ChartIcon, GridIcon, LogoIcon, PlusIcon, SettingsIcon } from '../components/icons';
+import { ChartIcon, GridIcon, LogoIcon, PlusIcon, SettingsIcon, UserIcon } from '../components/icons';
 import type { CurrentUser } from '../types/subscription';
 
 // Shell for every signed-in page: sidebar on the left, user in the top right,
@@ -14,8 +14,8 @@ const navItems: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/analytics', label: 'Analytics & Spend', icon: <ChartIcon className="h-5 w-5" /> },
 ];
 
-// Shown above Sign out in the sidebar, and at the end of the page links on small screens.
-const profileItem = { to: '/profile', label: 'Profile & Settings', icon: <SettingsIcon className="h-5 w-5" /> };
+// Shown above Settings in the sidebar, and at the end of the page links on small screens.
+const profileItem = { to: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> };
 
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600';
 
@@ -72,6 +72,10 @@ function navClass({ isActive }: { isActive: boolean }) {
   }`;
 }
 
+const soonPill = (
+  <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
+);
+
 export default function AppLayout() {
   const { auth } = useAuth();
   // Message for placeholder buttons whose pages don't exist yet.
@@ -120,6 +124,12 @@ export default function AppLayout() {
             {profileItem.icon}
             {profileItem.label}
           </NavLink>
+          <button type="button" onClick={comingSoon('Settings')}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 ${focusRing}`}>
+            <SettingsIcon className="h-5 w-5" />
+            Settings
+            {soonPill}
+          </button>
           <SignOutButton className="w-full text-left" />
         </div>
       </aside>
