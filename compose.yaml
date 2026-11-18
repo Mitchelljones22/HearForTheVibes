@@ -22,12 +22,12 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://database:5432/hearforthevibes
-      DATABASE_USERNAME: hearforthevibes
-      DATABASE_PASSWORD: hearforthevibes
-      TEST_DATABASE_URL: jdbc:postgresql://database-test:5432/hearforthevibes_test
-      TEST_DATABASE_USERNAME: hearforthevibes_test
-      TEST_DATABASE_PASSWORD: hearforthevibes_test
+      DATABASE_URL: jdbc:postgresql://database:5432/${DATABASE_NAME:?Set DATABASE_NAME in .env}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:?Set DATABASE_USERNAME in .env}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+      TEST_DATABASE_URL: jdbc:postgresql://database-test:5432/${TEST_DATABASE_NAME:?Set TEST_DATABASE_NAME in .env}
+      TEST_DATABASE_USERNAME: ${TEST_DATABASE_USERNAME:?Set TEST_DATABASE_USERNAME in .env}
+      TEST_DATABASE_PASSWORD: ${TEST_DATABASE_PASSWORD:?Set TEST_DATABASE_PASSWORD in .env}
     depends_on:
       database:
         condition: service_healthy
@@ -44,13 +44,13 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_DB: hearforthevibes
-      POSTGRES_USER: hearforthevibes
-      POSTGRES_PASSWORD: hearforthevibes
+      POSTGRES_DB: ${DATABASE_NAME:?Set DATABASE_NAME in .env}
+      POSTGRES_USER: ${DATABASE_USERNAME:?Set DATABASE_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hearforthevibes -d hearforthevibes"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -61,13 +61,13 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
     environment:
-      POSTGRES_DB: hearforthevibes_test
-      POSTGRES_USER: hearforthevibes_test
-      POSTGRES_PASSWORD: hearforthevibes_test
+      POSTGRES_DB: ${TEST_DATABASE_NAME:?Set TEST_DATABASE_NAME in .env}
+      POSTGRES_USER: ${TEST_DATABASE_USERNAME:?Set TEST_DATABASE_USERNAME in .env}
+      POSTGRES_PASSWORD: ${TEST_DATABASE_PASSWORD:?Set TEST_DATABASE_PASSWORD in .env}
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hearforthevibes_test -d hearforthevibes_test"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10

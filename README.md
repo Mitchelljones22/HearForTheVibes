@@ -39,6 +39,16 @@ If you already cloned the repository, use that existing folder. Open it in your 
 
 ## 3. Start the project
 
+Before the first start, create your local settings from the repository root:
+
+```sh
+cp .env.sample .env
+```
+
+In Windows PowerShell, use `Copy-Item .env.sample .env`. Set both passwords in `.env` before initializing fresh databases. Git ignores `.env` and other `.env.*` files except `.env.sample`. Keep real credentials in the ignored file.
+
+If you already have a PostgreSQL volume, keep its existing credentials in `.env`. Changing the file does not rotate a password stored in PostgreSQL. To change that password, run an explicit `ALTER ROLE` through an authenticated database connection, then update `.env` to match.
+
 Stop any frontend or backend servers you previously started outside Docker, then run:
 
 ```sh
@@ -65,7 +75,7 @@ Edit files normally in your local `frontend` and `backend` folders. The containe
 | Edit frontend components/styles | Save the file; Vite reloads automatically. |
 | Apply Java or backend configuration changes | `docker compose restart backend` recompiles and restarts Spring Boot. |
 | Apply frontend dependency changes | `docker compose restart frontend` reruns `npm ci` using the lockfile. |
-| Apply changes to `compose.yaml` | `docker compose up -d` recreates affected services as needed. |
+| Apply changes to `compose.yaml` or `.env` | `docker compose up -d` recreates affected services as needed. |
 | Check service status | `docker compose ps` |
 | Follow logs | `docker compose logs -f` |
 | View backend logs | `docker compose logs backend` |
@@ -99,22 +109,31 @@ Run one backend test process at a time. Host and container test runs share the t
 
 ## Run the backend from your host
 
-Install Java 25. If the backend container is running, stop it with `docker compose stop backend` to free port 8080. Then start the databases from the repository root:
+Install Java 25 and create `.env` as described above. If the backend container is running, stop it with `docker compose stop backend` to free port 8080. Then run these commands from the repository root in a POSIX shell:
 
 ```sh
 docker compose up -d database database-test
+set -a
+. ./.env
+set +a
+export DATABASE_URL="jdbc:postgresql://localhost:5432/${DATABASE_NAME}"
 cd backend
 sh ./mvnw spring-boot:run
 ```
 
-To run backend tests from another terminal, use these commands from the repository root:
+Spring does not load `.env` automatically. Each host terminal must export the settings it needs. To run backend tests from another terminal, use these commands from the repository root:
 
 ```sh
+set -a
+. ./.env
+set +a
 cd backend
 sh ./mvnw test
 ```
 
-The host defaults connect to the development database at `localhost:5432` and the test database at `localhost:5433`. To use another PostgreSQL server, set `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD` for development. Set `TEST_DATABASE_URL`, `TEST_DATABASE_USERNAME`, and `TEST_DATABASE_PASSWORD` for tests. URLs use the JDBC format `jdbc:postgresql://host:port/database`.
+Keep `.env` compatible with both Compose and your shell. Use single quotes around values that contain shell metacharacters. In PowerShell, set the corresponding `$env:DATABASE_*` or `$env:TEST_DATABASE_*` variables before running Maven.
+
+The backend requires `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`. The commands above connect it to the local development database on port 5432. Tests require `TEST_DATABASE_USERNAME` and `TEST_DATABASE_PASSWORD`. Their default URL connects to `TEST_DATABASE_NAME` on `localhost:5433`. Set `TEST_DATABASE_URL` to override that URL for another disposable PostgreSQL server. URLs use the JDBC format `jdbc:postgresql://host:port/database`.
 
 The test profile uses `create-drop`, which deletes and recreates tables. Point `TEST_DATABASE_*` only at a disposable test database. Use these custom environment variables instead of `SPRING_DATASOURCE_*`, which override the test profile and can send tests to the development database.
 
@@ -128,14 +147,9 @@ The hostname `backend` is internal to Docker. Use the localhost addresses above 
 
 The `database` Compose service runs development PostgreSQL. Its `postgres_data` named volume stores data at `/var/lib/postgresql/data`. Hibernate updates the development schema when the backend starts.
 
-These credentials are for local development only:
+Use [.env.sample](.env.sample) as the reference for local database names and credential settings. Compose reads your root `.env` and requires every listed setting. The `database` service binds to `localhost:5432`, and `database-test` binds to `localhost:5433`.
 
-| Service | Host address | Database | Username | Password |
-| --- | --- | --- | --- | --- |
-| `database` | `localhost:5432` | `hearforthevibes` | `hearforthevibes` | `hearforthevibes` |
-| `database-test` | `localhost:5433` | `hearforthevibes_test` | `hearforthevibes_test` | `hearforthevibes_test` |
-
-Both ports bind only to the host's loopback interface. Inside Docker, the backend uses the service names `database` and `database-test` on port 5432. Compose supplies separate `DATABASE_*` and `TEST_DATABASE_*` settings.
+Both ports bind only to the host's loopback interface. Inside Docker, the backend uses the service names `database` and `database-test` on port 5432. Compose builds the JDBC URLs from the database names and supplies separate `DATABASE_*` and `TEST_DATABASE_*` settings.
 
 - Each teammate has their own local PostgreSQL volume.
 - Container restarts and `docker compose down` preserve the database.
@@ -145,6 +159,28 @@ Both ports bind only to the host's loopback interface. Inside Docker, the backen
 
 Docker also keeps frontend dependencies, Maven downloads, and backend build output in separate volumes. Your host's existing `node_modules` and `target` folders are not used by these containers.
 
+## Connect a hosted backend to Supabase
+
+Use Supabase PostgreSQL for production. `compose.yaml` runs the local development stack only. Configure the hosted backend with environment variables in its hosting service.
+
+In the Supabase Dashboard, open **Connect** and select the **Session pooler** connection. Copy its host and username into the following settings. Keep the database password in a separate secret rather than embedding it in the JDBC URL.
+
+```dotenv
+DATABASE_URL=jdbc:postgresql://YOUR_SESSION_POOLER_HOST:5432/postgres?sslmode=require&currentSchema=app
+DATABASE_USERNAME=postgres.YOUR_PROJECT_REF
+DATABASE_PASSWORD=YOUR_SUPABASE_DATABASE_PASSWORD
+```
+
+Before starting the hosted backend, run this SQL in the Supabase SQL Editor:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS app;
+```
+
+`currentSchema=app` places application tables, including users and password hashes, in `app` instead of the default exposed `public` schema. Keep `app` out of Supabase's exposed schemas. Hibernate continues to update the application's schema at startup.
+
+Follow the official [Supabase Spring Boot guide](https://supabase.com/docs/guides/getting-started/quickstarts/spring-boot) and [PostgreSQL connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres) for the connection details for your project. Keep tests on the disposable local test database. Never point `TEST_DATABASE_*` at Supabase production because tests delete and recreate tables.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -152,6 +188,8 @@ Docker also keeps frontend dependencies, Maven downloads, and backend build outp
 | `docker` is not recognized | Install Docker Desktop and reopen your terminal. |
 | Cannot connect to the Docker daemon | Start Docker Desktop and wait for the engine to be ready. |
 | No Compose configuration found | Run the command from the folder containing `compose.yaml`. |
+| Compose reports `Set ... in .env` | Copy `.env.sample` to `.env` if needed and fill in the named setting. |
+| PostgreSQL rejects the password after an `.env` change | Use the credentials stored in the existing volume, or update the database role's password and `.env` together. |
 | Port 5173, 8080, 5432, or 5433 is already allocated | Stop the old local server or other container using that port, then retry. |
 | Backend waits for PostgreSQL or cannot connect | Check `docker compose ps` and `docker compose logs database database-test`. Both databases must be healthy. |
 | Frontend appears before backend is ready | Wait for Spring Boot's startup message; inspect `docker compose logs backend` if it exits. |

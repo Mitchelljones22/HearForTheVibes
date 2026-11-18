@@ -28,7 +28,7 @@ The form displays field errors beside inputs and general errors above the form. 
 
 ## Verification
 
-Start the stack with `docker compose up -d` from the repository root. Run these checks:
+Before the first start, run `cp .env.sample .env` from the repository root and set both local passwords. In Windows PowerShell, use `Copy-Item .env.sample .env`. If a development volume already exists, use its existing credentials. Start the stack with `docker compose up -d`, then run these checks:
 
 ```sh
 docker compose exec backend sh ./mvnw test
@@ -36,7 +36,18 @@ docker compose exec frontend npm run build
 docker compose exec frontend npm run lint
 ```
 
-To run Maven on the host with Java 25, start `docker compose up -d database-test` from the repository root. Then run `sh ./mvnw test` from `backend`. With local Node installed, run the npm checks from `frontend`.
+To run Maven on the host with Java 25, use these commands from the repository root in a POSIX shell:
+
+```sh
+docker compose up -d database-test
+set -a
+. ./.env
+set +a
+cd backend
+sh ./mvnw test
+```
+
+Spring does not load `.env` automatically. Export its settings in each host terminal. With local Node installed, run the npm checks from `frontend`.
 
 Backend integration tests activate the `test` profile and connect to the separate `database-test` PostgreSQL service. This profile uses `create-drop` and closes each integration test class's Spring context before the next class starts. Tests cover persistence, generated IDs, normalization, required fields, each password rule, email and phone duplicates, competing inserts, salted password verification, and password redaction. Direct repository saves verify PostgreSQL's unique constraints and successful reads and writes after a rejected duplicate.
 
@@ -44,12 +55,16 @@ Run one backend test process at a time. Host and container runs share the test d
 
 ## PostgreSQL configuration
 
-The development database runs PostgreSQL 17 in the `database` Compose service. Its database, username, and password are all `hearforthevibes`. The backend uses `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`. Host defaults use `jdbc:postgresql://localhost:5432/hearforthevibes`. Compose sets the URL to `jdbc:postgresql://database:5432/hearforthevibes`.
+The development database runs PostgreSQL 17 in the `database` Compose service. [.env.sample](../.env.sample) defines the local settings to copy into your ignored root `.env`. Compose reads those settings and supplies `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD` to the backend. A host backend requires those variables too. See [the host setup commands](../README.md#run-the-backend-from-your-host) to export them.
 
-The test database, username, and password are all `hearforthevibes_test`. Tests use `TEST_DATABASE_URL`, `TEST_DATABASE_USERNAME`, and `TEST_DATABASE_PASSWORD`. Host defaults use `jdbc:postgresql://localhost:5433/hearforthevibes_test`. Compose sets the test URL to `jdbc:postgresql://database-test:5432/hearforthevibes_test`. These credentials are for local development only.
+Tests require `TEST_DATABASE_USERNAME` and `TEST_DATABASE_PASSWORD`. Their default URL connects to `TEST_DATABASE_NAME` on `localhost:5433`. Compose supplies `TEST_DATABASE_URL` with the internal service name `database-test` on port 5432. The database names and credentials come from `.env`.
 
 Point `TEST_DATABASE_*` only at a disposable database because tests delete and recreate its schema. Use these custom environment variables instead of `SPRING_DATASOURCE_*`, which take precedence over the test profile. With the supplied settings, development and tests use separate PostgreSQL servers and credentials.
 
 The `postgres_data` named volume preserves development accounts across backend restarts and `docker compose down`. The test service uses memory storage and discards its data when the container stops. Do not run `docker compose down -v` if you need to retain local data.
+
+Changing `.env` does not rotate credentials stored in an existing PostgreSQL volume. Keep the existing values, or run an explicit `ALTER ROLE` through an authenticated connection and update `.env` to match.
+
+Production uses hosted Supabase PostgreSQL. Follow [the Supabase setup](../README.md#connect-a-hosted-backend-to-supabase) to configure the backend's environment and create the `app` schema before startup. Application user records and password hashes belong in `app`, outside the default exposed `public` schema. Keep `app` out of Supabase's exposed schemas, and never run tests against production.
 
 Existing SQLite accounts are not imported automatically. The legacy `database` volume remains declared but unmounted, preserving its SQLite file. Keep any existing local `backend/data` SQLite files for a later explicit migration. See [the development setup](../README.md) for startup and host commands.
