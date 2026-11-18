@@ -2,13 +2,13 @@
 
 ## Team development setup
 
-Use Docker Compose to run the frontend and backend together. Docker provides Node.js, Java, and the build tools, so you do not need to install them separately to run the project.
+Use Docker Compose to run the frontend, backend, and databases together. Docker provides Node.js, Java, PostgreSQL, and the build tools, so you do not need to install them separately to run the project.
 
 | Component | Stack |
 | --- | --- |
 | Frontend | React, TypeScript, Vite, Node.js 24 |
 | Backend | Java 25, Spring Boot 4.1.1, Maven Wrapper |
-| Database | SQLite, stored in a persistent Docker volume |
+| Database | PostgreSQL 17, stored in a persistent Docker volume |
 
 This configuration is for local development. The registration form creates accounts through the Spring Boot API. See [Registration](docs/Registration.md) for the request format, validation rules, and code walkthrough.
 
@@ -45,7 +45,7 @@ Stop any frontend or backend servers you previously started outside Docker, then
 docker compose up
 ```
 
-The first start downloads container images, Node dependencies, Maven, and Java dependencies. It can take several minutes and requires internet access. Both services start independently, so wait for Vite's ready message and Spring Boot's `Started BackendApplication` message.
+The first start downloads container images, Node dependencies, Maven, and Java dependencies. It can take several minutes and requires internet access. The backend waits for the development and test PostgreSQL services to be healthy. Wait for Vite's ready message and Spring Boot's `Started BackendApplication` message.
 
 | Application | Local address |
 | --- | --- |
@@ -85,7 +85,7 @@ Commit frontend dependency changes together with `frontend/package-lock.json`. T
 
 ## Run checks inside Docker
 
-With both services running, use a second terminal in the project root:
+With the services running, use a second terminal in the project root:
 
 ```sh
 docker compose exec frontend npm run lint
@@ -93,7 +93,30 @@ docker compose exec frontend npm run build
 docker compose exec backend sh ./mvnw test
 ```
 
-These use the container tools; no local Node or Java installation is required. Backend tests cover application startup and registration, using separate SQLite databases under `backend/target` rather than the development database.
+These use the container tools; no local Node or Java installation is required. Backend tests cover application startup, registration, and sessions. The `test` profile uses the separate `database-test` PostgreSQL service with its own credentials and recreates its schema for each integration test class. The test service stores data in memory and discards it when the container stops.
+
+Run one backend test process at a time. Host and container test runs share the test database, so concurrent runs can reset each other's schema.
+
+## Run the backend from your host
+
+Install Java 25. If the backend container is running, stop it with `docker compose stop backend` to free port 8080. Then start the databases from the repository root:
+
+```sh
+docker compose up -d database database-test
+cd backend
+sh ./mvnw spring-boot:run
+```
+
+To run backend tests from another terminal, use these commands from the repository root:
+
+```sh
+cd backend
+sh ./mvnw test
+```
+
+The host defaults connect to the development database at `localhost:5432` and the test database at `localhost:5433`. To use another PostgreSQL server, set `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD` for development. Set `TEST_DATABASE_URL`, `TEST_DATABASE_USERNAME`, and `TEST_DATABASE_PASSWORD` for tests. URLs use the JDBC format `jdbc:postgresql://host:port/database`.
+
+The test profile uses `create-drop`, which deletes and recreates tables. Point `TEST_DATABASE_*` only at a disposable test database. Use these custom environment variables instead of `SPRING_DATASOURCE_*`, which override the test profile and can send tests to the development database.
 
 ## Frontend-to-backend requests
 
@@ -103,12 +126,21 @@ The hostname `backend` is internal to Docker. Use the localhost addresses above 
 
 ## Database and local files
 
-SQLite runs inside the backend process; there is no separate database service to install. Docker creates a named volume mounted at `/app/data`, and the application uses `/app/data/hearforthevibes.db`. The database file is created when the application first opens a connection to it.
+The `database` Compose service runs development PostgreSQL. Its `postgres_data` named volume stores data at `/var/lib/postgresql/data`. Hibernate updates the development schema when the backend starts.
 
-- Each teammate has their own local database volume.
+These credentials are for local development only:
+
+| Service | Host address | Database | Username | Password |
+| --- | --- | --- | --- | --- |
+| `database` | `localhost:5432` | `hearforthevibes` | `hearforthevibes` | `hearforthevibes` |
+| `database-test` | `localhost:5433` | `hearforthevibes_test` | `hearforthevibes_test` | `hearforthevibes_test` |
+
+Both ports bind only to the host's loopback interface. Inside Docker, the backend uses the service names `database` and `database-test` on port 5432. Compose supplies separate `DATABASE_*` and `TEST_DATABASE_*` settings.
+
+- Each teammate has their own local PostgreSQL volume.
 - Container restarts and `docker compose down` preserve the database.
 - **Do not add `-v` to `docker compose down` unless you intend to delete the database and the other named volumes.**
-- The Docker database is separate from any existing file in your local `backend/data` folder. Docker does not import that file automatically.
+- Existing SQLite accounts are not imported automatically. The old `database` named volume remains declared but unmounted, so its SQLite file is retained. Keep any existing `backend/data` SQLite files until you decide whether to migrate those accounts.
 - Share schema and sample-data scripts through Git as they are implemented. Working database files are not committed.
 
 Docker also keeps frontend dependencies, Maven downloads, and backend build output in separate volumes. Your host's existing `node_modules` and `target` folders are not used by these containers.
@@ -120,7 +152,8 @@ Docker also keeps frontend dependencies, Maven downloads, and backend build outp
 | `docker` is not recognized | Install Docker Desktop and reopen your terminal. |
 | Cannot connect to the Docker daemon | Start Docker Desktop and wait for the engine to be ready. |
 | No Compose configuration found | Run the command from the folder containing `compose.yaml`. |
-| Port 5173 or 8080 is already allocated | Stop the old local server or other container using that port, then retry. |
+| Port 5173, 8080, 5432, or 5433 is already allocated | Stop the old local server or other container using that port, then retry. |
+| Backend waits for PostgreSQL or cannot connect | Check `docker compose ps` and `docker compose logs database database-test`. Both databases must be healthy. |
 | Frontend appears before backend is ready | Wait for Spring Boot's startup message; inspect `docker compose logs backend` if it exits. |
 | `/api/...` returns 404 | Confirm that the backend implements that exact route. Registration uses `POST /api/auth/register`. |
 | `npm ci` reports a lockfile mismatch | Ensure `package.json` and `package-lock.json` came from the same dependency update. |

@@ -10,8 +10,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
@@ -20,15 +23,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:sqlite:target/registration-tests.db",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.open-in-view=false"
-})
+@SpringBootTest
+@ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
 class RegistrationTests {
@@ -69,6 +71,20 @@ class RegistrationTests {
         assertThat(body).doesNotContain(PASSWORD, saved.getPasswordHash());
         assertThat(mapper.writeValueAsString(saved)).doesNotContain("passwordHash", saved.getPasswordHash());
         assertThat(output.getAll()).doesNotContain(PASSWORD);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"firstName", "lastName", "email"})
+    void preservesAcceptedRegistrationFieldsLongerThan255Characters(String field) throws Exception {
+        var request = validRequest();
+        request.put(field, field.equals("email") ? "a".repeat(280) + "@example.com" : "a".repeat(300));
+
+        submit(request).andExpect(status().isCreated());
+
+        User saved = users.findByEmail(request.get("email")).orElseThrow();
+        assertThat(saved.getFirstName()).isEqualTo(request.get("firstName"));
+        assertThat(saved.getLastName()).isEqualTo(request.get("lastName"));
+        assertThat(saved.getEmail()).isEqualTo(request.get("email"));
     }
 
     @ParameterizedTest
@@ -157,6 +173,39 @@ class RegistrationTests {
                 .andExpect(jsonPath("$.errors.email").isString())
                 .andExpect(jsonPath("$.errors.phone").isString());
         assertThat(users.count()).isEqualTo(1);
+    }
+
+    @Test
+    void databaseRejectsDuplicateEmailAndAllowsAnotherSaveAfterRollback() {
+        User first = users.saveAndFlush(new User("Jane", "Doe", "jane@example.com", "hash", "8165550123"));
+
+        assertThatThrownBy(() -> users.saveAndFlush(
+                new User("Other", "User", "jane@example.com", "hash", "8165550124")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        User second = users.saveAndFlush(new User("Other", "User", "other@example.com", "hash", "8165550124"));
+        assertThat(users.findByEmail("jane@example.com")).get()
+                .extracting(User::getId).isEqualTo(first.getId());
+        assertThat(users.findByEmail("other@example.com")).get()
+                .extracting(User::getId).isEqualTo(second.getId());
+        assertThat(first.getId()).isPositive();
+        assertThat(second.getId()).isPositive().isNotEqualTo(first.getId());
+        assertThat(users.count()).isEqualTo(2);
+    }
+
+    @Test
+    void databaseRejectsDuplicatePhoneAndAllowsAnotherSaveAfterRollback() {
+        User first = users.saveAndFlush(new User("Jane", "Doe", "jane@example.com", "hash", "8165550123"));
+
+        assertThatThrownBy(() -> users.saveAndFlush(
+                new User("Other", "User", "other@example.com", "hash", "8165550123")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        User second = users.saveAndFlush(new User("Other", "User", "other@example.com", "hash", "8165550124"));
+        assertThat(users.existsByPhoneNumber("8165550123")).isTrue();
+        assertThat(users.existsByPhoneNumber("8165550124")).isTrue();
+        assertThat(second.getId()).isNotEqualTo(first.getId());
+        assertThat(users.count()).isEqualTo(2);
     }
 
     @Test

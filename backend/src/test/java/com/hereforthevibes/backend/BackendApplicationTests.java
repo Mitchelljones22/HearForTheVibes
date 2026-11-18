@@ -2,11 +2,12 @@ package com.hereforthevibes.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest(properties = {
-		"spring.datasource.url=jdbc:sqlite:target/context-tests.db",
-		"spring.jpa.hibernate.ddl-auto=create-drop"
-})
+@SpringBootTest
+@ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BackendApplicationTests {
 
 	@Test

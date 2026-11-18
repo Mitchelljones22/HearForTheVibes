@@ -22,17 +22,61 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:sqlite:/app/data/hearforthevibes.db
+      DATABASE_URL: jdbc:postgresql://database:5432/hearforthevibes
+      DATABASE_USERNAME: hearforthevibes
+      DATABASE_PASSWORD: hearforthevibes
+      TEST_DATABASE_URL: jdbc:postgresql://database-test:5432/hearforthevibes_test
+      TEST_DATABASE_USERNAME: hearforthevibes_test
+      TEST_DATABASE_PASSWORD: hearforthevibes_test
+    depends_on:
+      database:
+        condition: service_healthy
+      database-test:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - backend_build:/app/target
       - maven_cache:/root/.m2
-      - database:/app/data
     command: ["sh", "./mvnw", "spring-boot:run"]
+
+  database:
+    image: postgres:17
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: hearforthevibes
+      POSTGRES_USER: hearforthevibes
+      POSTGRES_PASSWORD: hearforthevibes
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hearforthevibes -d hearforthevibes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  database-test:
+    image: postgres:17
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_DB: hearforthevibes_test
+      POSTGRES_USER: hearforthevibes_test
+      POSTGRES_PASSWORD: hearforthevibes_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hearforthevibes_test -d hearforthevibes_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   frontend_dependencies:
   npm_cache:
   backend_build:
   maven_cache:
+  postgres_data:
   database:
